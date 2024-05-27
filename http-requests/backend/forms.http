@@ -1,0 +1,39 @@
+# Crear o actualizar un formulario
+POST {{API_URL}}form
+Authorization: Bearer {{TOKEN}}
+Content-Type: application/json
+
+{
+  "title": "Nuevo Formulario",
+  "icon": "mdi-new-icon",
+  "link": "dashboard-nuevo",
+  "setting": true,
+  "color": "blue",
+  "count": "10",
+  "order": 1,
+  "public_to_intranet": false,
+  "menu_tree_id": null,
+  "condition": "active"
+}
+
+###
+# Obtener todos los formularios
+GET {{API_URL}}forms
+Content-Type: application/json
+Authorization: Bearer {{TOKEN}}
+
+###
+# Obtener formularios con paginación
+GET {{API_URL}}forms/1?rows=1
+Content-Type: application/json
+Authorization: Bearer {{TOKEN}}
+
+###
+# Eliminar un formulario
+POST {{API_URL}}form/delete
+Content-Type: application/json
+Authorization: Bearer {{TOKEN}}
+
+{
+  "id": 4
+}

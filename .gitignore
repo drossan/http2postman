@@ -1,0 +1,39 @@
+# Directorios de caché de IntelliJ
+.idea/
+
+# Directories de caché de VSCode
+.vscode/
+
+# Binarios para programas y complementos
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Directorio de prueba
+_test
+
+# Salida de la herramienta de cobertura de pruebas
+*.out
+
+# Dependencias
+/vendor/
+
+# Archivos de log
+*.log
+
+# Archivos generados
+*.gen.go
+
+# Directorio de caché para los comandos go
+.GOCACHE
+
+# Archivos de los objetos de los comandos go (.o) y paquetes de comandos go (.a)
+# Nota: https://golang.org/cmd/go/#hdr-Clean_directory_list
+*.o
+*.a
+
+# Archivos de caché de comandos go
+*.test
+*.test.cache

@@ -1,0 +1,16 @@
+### Crear un nuevo hotel (requiere TOKEN)
+POST {{API_URL}}hotels
+Authorization: Bearer {{TOKEN}}
+Content-Type: application/json
+
+{
+  "name": "Hotel California",
+  "location": "California"
+}
+
+###
+
+### Obtener hotel por ID (requiere TOKEN)
+GET {{API_URL}}hotels/1
+Authorization: Bearer {{TOKEN}}
+Content-Type: application/json

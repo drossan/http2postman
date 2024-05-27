@@ -1,0 +1,31 @@
+### Obtener todos los menús expanse
+GET {{API_URL}}expanses-menus
+Authorization: Bearer {{TOKEN}}
+Content-Type: application/json
+
+### Obtener menús expanse con paginación (requiere TOKEN)
+GET {{API_URL}}expanses-menus/1?rows=10
+Authorization: Bearer {{TOKEN}}
+Content-Type: application/json
+
+### Crear o actualizar un menú expanse (requiere TOKEN)
+POST {{API_URL}}expanses-menus
+Authorization: Bearer {{TOKEN}}
+Content-Type: application/json
+
+{
+  "Title": "New Menu",
+  "Icon": "mdi-icon",
+  "Link": "/new-link",
+  "Color": "blue",
+  "Order": 1
+}
+
+### Eliminar un menú expanse (requiere TOKEN)
+POST {{API_URL}}expanses-menus/delete
+Authorization: Bearer {{TOKEN}}
+Content-Type: application/json
+
+{
+  "ID": 4
+}
