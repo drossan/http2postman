@@ -1,6 +1,0 @@
-###
-# Login de usuario
-POST {{API_URL}}login
-Content-Type: application/x-www-form-urlencoded
-
-email=dani@islait.es&password=1234admin
