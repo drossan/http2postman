@@ -31,7 +31,7 @@ universal_binaries:
     replace: true
 
 brews:
-  - name: griddo-env
+  - name: http2postman
     homepage: https://github.com/drossan/http2postman
     description: "Exporta tu colección http-request a postman"
     repository:
@@ -39,7 +39,7 @@ brews:
       name: homebrew-tools
     folder: Formula
     commit_author:
-      name: griddo-env
+      name: http2postman
       email: bot@drossan.com
 
 checksum:
