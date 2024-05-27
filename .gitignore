@@ -17,8 +17,6 @@ _test
 # Salida de la herramienta de cobertura de pruebas
 *.out
 
-# Dependencias
-/vendor/
 
 # Archivos de log
 *.log
