@@ -28,7 +28,7 @@ diferentes entornos y equipos.
 
 2. Instala la herramienta:
     ```sh
-    brew install griddo-env
+    brew install http2postman
     ```
 
 ## Uso
