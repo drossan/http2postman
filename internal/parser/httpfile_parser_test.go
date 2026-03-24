@@ -240,6 +240,42 @@ func TestParseHTTPContent_MultilineComments(t *testing.T) {
 	}
 }
 
+func TestCleanCommentName(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"# Create Social Token", "Create Social Token"},
+		{"# ─── Create Social Token ────────────────────────────────────", "Create Social Token"},
+		{"# --- My Request ---", "My Request"},
+		{"# === My Request ===", "My Request"},
+		{"# ─── Get Users ───", "Get Users"},
+		{"# Simple Name", "Simple Name"},
+		{"## Double Hash", "Double Hash"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			got := cleanCommentName(tt.input)
+			if got != tt.expected {
+				t.Errorf("cleanCommentName(%q) = %q, want %q", tt.input, got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestParseHTTPContent_DecorativeComments(t *testing.T) {
+	content := "# ─── Create Social Token ────────────────────────────────────\nPOST https://api.example.com/token\nContent-Type: application/json\n"
+
+	requests, err := ParseHTTPContent(content)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if requests[0].Name != "Create Social Token" {
+		t.Errorf("name: got %q, want %q", requests[0].Name, "Create Social Token")
+	}
+}
+
 func TestHTTPFileParser_ParseFile(t *testing.T) {
 	memFS := fs.NewMemoryFileSystem()
 	memFS.WriteFile("test/api.http", []byte("# Test\nGET https://example.com\n"), 0644)

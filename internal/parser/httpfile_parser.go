@@ -127,9 +127,7 @@ func parseHTTPSection(section string) (*model.HTTPRequest, error) {
 		if strings.HasPrefix(trimmed, "#") {
 			// Use the first comment as name; skip subsequent comments
 			if name == "" {
-				name = strings.TrimPrefix(trimmed, "# ")
-				name = strings.TrimPrefix(name, "#")
-				name = strings.TrimSpace(name)
+				name = cleanCommentName(trimmed)
 			}
 			continue
 		}
@@ -200,6 +198,19 @@ func filterHostHeader(headers []model.HTTPHeader) []model.HTTPHeader {
 		}
 	}
 	return filtered
+}
+
+// cleanCommentName extracts a clean name from a comment line, stripping
+// the # prefix and decorative characters like ─, ═, -, =, ~.
+func cleanCommentName(line string) string {
+	// Remove leading # characters and spaces
+	name := strings.TrimLeft(line, "# ")
+	// Remove decorative box-drawing and separator characters from both ends
+	name = strings.Trim(name, "─═—–-=~_ ")
+	// Clean up any remaining internal sequences of decorative chars
+	// (e.g., "── Create Token ──" → "Create Token")
+	name = strings.TrimSpace(name)
+	return name
 }
 
 func parseHeadersAndBody(lines []string) ([]model.HTTPHeader, string) {
