@@ -32,8 +32,13 @@ El binario se genera en `bin/http2postman`.
 ### Exportar solicitudes HTTP a una colección de Postman
 
 ```sh
-http2postman export [directorio]
+http2postman export [directorio] [flags]
 ```
+
+| Flag | Descripción | Default |
+|------|-------------|---------|
+| `-o, --output` | Ruta del archivo de salida | `import_postman_collection.json` |
+| `-f, --force` | Sobreescribir si el archivo ya existe | `false` |
 
 Lee los archivos `.http` en el directorio especificado y genera una colección de Postman en formato JSON.
 
@@ -50,31 +55,36 @@ http-requests/
     └── pages.http
 ```
 
-Ejecuta:
-
 ```sh
 http2postman export http-requests
+http2postman export http-requests -o my_collection.json --force
 ```
-
-La herramienta pedirá un nombre para la colección y generará el archivo `import_postman_collection.json` listo para
-importar en Postman.
 
 ### Importar una colección de Postman a archivos HTTP
 
 ```sh
-http2postman import [archivo.json]
+http2postman import [archivo.json] [flags]
 ```
 
-Lee una colección de Postman en formato JSON y genera archivos `.http` en el directorio `http-requests/`, replicando
-la estructura de carpetas de la colección.
+| Flag | Descripción | Default |
+|------|-------------|---------|
+| `-o, --output` | Directorio de salida | `http-requests` |
+| `-f, --force` | Sobreescribir archivos existentes | `false` |
+
+Lee una colección de Postman en formato JSON y genera archivos `.http` replicando la estructura de carpetas.
 
 **Ejemplo:**
 
 ```sh
-http2postman import import_postman_collection.json
+http2postman import collection.json
+http2postman import collection.json -o my-requests --force
 ```
 
-Esto creará archivos `.http` en `http-requests/` con la estructura y contenido de la colección.
+### Ver versión
+
+```sh
+http2postman version
+```
 
 ## Formato de archivos .http
 
@@ -135,6 +145,17 @@ variables se incluirán automáticamente en la colección de Postman exportada.
 Las versiones estables e inestables están disponibles en la
 [página de releases](https://github.com/drossan/http2postman/releases).
 
+## Desarrollo
+
+```sh
+make build          # Compilar
+make test           # Ejecutar tests
+make test-coverage  # Tests con cobertura
+make vet            # Análisis estático
+make check          # fmt + vet + tests
+make clean          # Limpiar artefactos
+```
+
 ## Licencia
 
-Este proyecto está pendiente de definir su licencia.
+Este proyecto está bajo la licencia MIT. Ver [LICENSE](LICENSE) para más detalles.

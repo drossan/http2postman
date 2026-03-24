@@ -10,28 +10,39 @@ permissions:
   contents: write
 
 jobs:
-  goreleaser:
+  test:
     runs-on: ubuntu-latest
     steps:
-      -
-        name: Checkout
-        uses: actions/checkout@v2
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+      - name: Vet
+        run: go vet -mod=vendor ./...
+      - name: Test
+        run: go test -mod=vendor ./... -v
+
+  goreleaser:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      -
-        name: Fetch all tags
+      - name: Fetch all tags
         run: git fetch --force --tags
-      -
-        name: Set up Go
-        uses: actions/setup-go@v2
+      - name: Set up Go
+        uses: actions/setup-go@v5
         with:
-          go-version: 1.22.0
-      -
-        name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v2
+          go-version: "1.22"
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v5
         with:
           distribution: goreleaser
-          version: ${{ env.GITHUB_REF_NAME }}
-          args: release --rm-dist
+          version: latest
+          args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.PUBLISHER_TOKEN }}
