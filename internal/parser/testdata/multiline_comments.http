@@ -1,0 +1,6 @@
+# Returns all available activity event type categories for filtering.
+# This endpoint requires authentication.
+GET /logs/activity/events-type HTTP/1.1
+Host: {{API_URL}}
+Content-Type: application/json
+Authorization: {{TOKEN}}

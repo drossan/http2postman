@@ -209,6 +209,37 @@ func TestParseHTTPContent_MixedFormats(t *testing.T) {
 	}
 }
 
+func TestParseHTTPContent_MultilineComments(t *testing.T) {
+	content, err := os.ReadFile("testdata/multiline_comments.http")
+	if err != nil {
+		t.Fatalf("reading fixture: %v", err)
+	}
+
+	requests, err := ParseHTTPContent(string(content))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(requests) != 1 {
+		t.Fatalf("expected 1 request, got %d", len(requests))
+	}
+
+	req := requests[0]
+	// First comment line becomes the name
+	if req.Name != "Returns all available activity event type categories for filtering." {
+		t.Errorf("name: got %q", req.Name)
+	}
+	if req.Method != "GET" {
+		t.Errorf("method: got %q", req.Method)
+	}
+	if req.URL != "{{API_URL}}/logs/activity/events-type" {
+		t.Errorf("url: got %q", req.URL)
+	}
+	// Host should be filtered out, leaving Content-Type and Authorization
+	if len(req.Headers) != 2 {
+		t.Errorf("expected 2 headers, got %d: %+v", len(req.Headers), req.Headers)
+	}
+}
+
 func TestHTTPFileParser_ParseFile(t *testing.T) {
 	memFS := fs.NewMemoryFileSystem()
 	memFS.WriteFile("test/api.http", []byte("# Test\nGET https://example.com\n"), 0644)

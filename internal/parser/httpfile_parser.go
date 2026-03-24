@@ -109,28 +109,35 @@ func parseHTTPSection(section string) (*model.HTTPRequest, error) {
 		return nil, fmt.Errorf("%w: empty section", model.ErrInvalidHTTPFormat)
 	}
 
-	// Detect format: first line can be either a comment (# Name) or a request line (METHOD URL)
+	// Find the request line (METHOD URL), skipping comment lines (#) and blank lines.
+	// The first comment line becomes the request name.
 	var name string
-	var requestLineIdx int
+	requestLineIdx := -1
 
-	firstLine := strings.TrimSpace(lines[0])
-	firstWord := strings.SplitN(firstLine, " ", 2)[0]
-
-	if httpMethods[firstWord] {
-		// Format 2: first line IS the request line (no comment)
-		requestLineIdx = 0
-	} else if strings.HasPrefix(firstLine, "#") {
-		// Format 1: first line is a comment, second line is the request line
-		name = strings.TrimPrefix(firstLine, "# ")
-		name = strings.TrimPrefix(name, "#")
-		name = strings.TrimSpace(name)
-		requestLineIdx = 1
-	} else {
-		return nil, fmt.Errorf("%w: first line is neither a comment nor a request line: %q", model.ErrInvalidHTTPFormat, firstLine)
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
+			continue
+		}
+		firstWord := strings.SplitN(trimmed, " ", 2)[0]
+		if httpMethods[firstWord] {
+			requestLineIdx = i
+			break
+		}
+		if strings.HasPrefix(trimmed, "#") {
+			// Use the first comment as name; skip subsequent comments
+			if name == "" {
+				name = strings.TrimPrefix(trimmed, "# ")
+				name = strings.TrimPrefix(name, "#")
+				name = strings.TrimSpace(name)
+			}
+			continue
+		}
+		return nil, fmt.Errorf("%w: unexpected line before request: %q", model.ErrInvalidHTTPFormat, trimmed)
 	}
 
-	if requestLineIdx >= len(lines) {
-		return nil, fmt.Errorf("%w: missing request line", model.ErrInvalidHTTPFormat)
+	if requestLineIdx < 0 {
+		return nil, fmt.Errorf("%w: no request line found", model.ErrInvalidHTTPFormat)
 	}
 
 	method, url, err := parseRequestLine(strings.TrimSpace(lines[requestLineIdx]))
