@@ -90,8 +90,9 @@ type PostmanFormData struct {
 
 // PostmanAuth represents authentication configuration.
 type PostmanAuth struct {
-	Type   string     `json:"type"`
+	Type   string      `json:"type"`
 	Bearer []PostmanKV `json:"bearer,omitempty"`
+	APIKey []PostmanKV `json:"apikey,omitempty"`
 }
 
 // PostmanKV is a generic key-value pair.
