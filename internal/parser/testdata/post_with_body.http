@@ -1,0 +1,9 @@
+# Create User
+POST https://api.example.com/users
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "name": "John",
+  "email": "john@example.com"
+}

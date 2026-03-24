@@ -1,0 +1,28 @@
+{
+  "info": {
+    "name": "Auth Collection",
+    "_postman_id": "auth789",
+    "description": "Collection with bearer auth",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Protected",
+      "auth": {
+        "type": "bearer",
+        "bearer": [
+          {"key": "token", "value": "my-secret-token"}
+        ]
+      },
+      "item": [
+        {
+          "name": "Get Profile",
+          "request": {
+            "method": "GET",
+            "url": {"raw": "https://api.example.com/profile"}
+          }
+        }
+      ]
+    }
+  ]
+}

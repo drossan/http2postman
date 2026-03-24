@@ -1,0 +1,16 @@
+# List Users
+GET https://api.example.com/users
+Accept: application/json
+
+###
+
+# Create User
+POST https://api.example.com/users
+Content-Type: application/json
+
+{"name": "Alice"}
+
+###
+
+# Delete User
+DELETE https://api.example.com/users/1
