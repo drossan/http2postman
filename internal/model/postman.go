@@ -46,6 +46,11 @@ type PostmanURL struct {
 	Raw string `json:"raw"`
 }
 
+// MarshalJSON serializes the URL as a plain string for maximum Postman compatibility.
+func (u PostmanURL) MarshalJSON() ([]byte, error) {
+	return json.Marshal(u.Raw)
+}
+
 // UnmarshalJSON handles both string and object URL formats from Postman.
 func (u *PostmanURL) UnmarshalJSON(data []byte) error {
 	var raw string
