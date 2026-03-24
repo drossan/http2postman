@@ -109,8 +109,103 @@ func TestParseHTTPContent_Malformed(t *testing.T) {
 	}
 
 	_, err = ParseHTTPContent(string(content))
-	if !errors.Is(err, model.ErrInvalidURLFormat) {
-		t.Errorf("expected ErrInvalidURLFormat, got %v", err)
+	if !errors.Is(err, model.ErrInvalidHTTPFormat) {
+		t.Errorf("expected ErrInvalidHTTPFormat, got %v", err)
+	}
+}
+
+func TestParseHTTPContent_NoCommentWithHost(t *testing.T) {
+	content, err := os.ReadFile("testdata/no_comment_with_host.http")
+	if err != nil {
+		t.Fatalf("reading fixture: %v", err)
+	}
+
+	requests, err := ParseHTTPContent(string(content))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(requests) != 1 {
+		t.Fatalf("expected 1 request, got %d", len(requests))
+	}
+
+	req := requests[0]
+	if req.Method != "POST" {
+		t.Errorf("method: got %q, want %q", req.Method, "POST")
+	}
+	// URL should be Host + path
+	if req.URL != "{{API_URL}}/cache/public-api/invalidate" {
+		t.Errorf("url: got %q, want %q", req.URL, "{{API_URL}}/cache/public-api/invalidate")
+	}
+	// Host header should be filtered out
+	for _, h := range req.Headers {
+		if h.Key == "Host" {
+			t.Error("Host header should be filtered out")
+		}
+	}
+	if len(req.Headers) != 2 {
+		t.Errorf("expected 2 headers (Content-Type, Authorization), got %d: %+v", len(req.Headers), req.Headers)
+	}
+	if req.Body == "" {
+		t.Fatal("expected non-empty body")
+	}
+	// Name is auto-generated from method + path (before Host resolution)
+	if req.Name != "POST /cache/public-api/invalidate" {
+		t.Errorf("name: got %q", req.Name)
+	}
+}
+
+func TestParseHTTPContent_NoCommentAbsoluteURL(t *testing.T) {
+	content, err := os.ReadFile("testdata/no_comment_absolute_url.http")
+	if err != nil {
+		t.Fatalf("reading fixture: %v", err)
+	}
+
+	requests, err := ParseHTTPContent(string(content))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	req := requests[0]
+	if req.Method != "GET" {
+		t.Errorf("method: got %q, want %q", req.Method, "GET")
+	}
+	// HTTP/1.1 suffix should be stripped, URL preserved
+	if req.URL != "https://api.example.com/users" {
+		t.Errorf("url: got %q, want %q", req.URL, "https://api.example.com/users")
+	}
+	if len(req.Headers) != 2 {
+		t.Errorf("expected 2 headers, got %d", len(req.Headers))
+	}
+}
+
+func TestParseHTTPContent_MixedFormats(t *testing.T) {
+	content, err := os.ReadFile("testdata/mixed_formats.http")
+	if err != nil {
+		t.Fatalf("reading fixture: %v", err)
+	}
+
+	requests, err := ParseHTTPContent(string(content))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(requests) != 2 {
+		t.Fatalf("expected 2 requests, got %d", len(requests))
+	}
+
+	// First: with comment
+	if requests[0].Name != "Get Users" {
+		t.Errorf("first request name: got %q", requests[0].Name)
+	}
+	if requests[0].Method != "GET" {
+		t.Errorf("first request method: got %q", requests[0].Method)
+	}
+
+	// Second: without comment, with Host
+	if requests[1].Method != "POST" {
+		t.Errorf("second request method: got %q", requests[1].Method)
+	}
+	if requests[1].URL != "{{API_URL}}/auth/login" {
+		t.Errorf("second request url: got %q", requests[1].URL)
 	}
 }
 

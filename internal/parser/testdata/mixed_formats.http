@@ -1,0 +1,11 @@
+# Get Users
+GET https://api.example.com/users
+Accept: application/json
+
+###
+
+POST /auth/login HTTP/1.1
+Host: {{API_URL}}
+Content-Type: application/json
+
+{"user": "test"}

@@ -97,28 +97,102 @@ func ParseHTTPContent(content string) ([]model.HTTPRequest, error) {
 	return requests, nil
 }
 
+// httpMethods contains the standard HTTP methods for detecting request lines.
+var httpMethods = map[string]bool{
+	"GET": true, "POST": true, "PUT": true, "PATCH": true,
+	"DELETE": true, "HEAD": true, "OPTIONS": true, "TRACE": true, "CONNECT": true,
+}
+
 func parseHTTPSection(section string) (*model.HTTPRequest, error) {
 	lines := strings.Split(section, "\n")
-	if len(lines) < 2 {
-		return nil, fmt.Errorf("%w: section has fewer than 2 lines", model.ErrInvalidHTTPFormat)
+	if len(lines) < 1 {
+		return nil, fmt.Errorf("%w: empty section", model.ErrInvalidHTTPFormat)
 	}
 
-	name := strings.TrimPrefix(strings.TrimSpace(lines[0]), "# ")
+	// Detect format: first line can be either a comment (# Name) or a request line (METHOD URL)
+	var name string
+	var requestLineIdx int
 
-	urlLine := strings.SplitN(strings.TrimSpace(lines[1]), " ", 2)
-	if len(urlLine) < 2 {
-		return nil, fmt.Errorf("%w: %q", model.ErrInvalidURLFormat, lines[1])
+	firstLine := strings.TrimSpace(lines[0])
+	firstWord := strings.SplitN(firstLine, " ", 2)[0]
+
+	if httpMethods[firstWord] {
+		// Format 2: first line IS the request line (no comment)
+		requestLineIdx = 0
+	} else if strings.HasPrefix(firstLine, "#") {
+		// Format 1: first line is a comment, second line is the request line
+		name = strings.TrimPrefix(firstLine, "# ")
+		name = strings.TrimPrefix(name, "#")
+		name = strings.TrimSpace(name)
+		requestLineIdx = 1
+	} else {
+		return nil, fmt.Errorf("%w: first line is neither a comment nor a request line: %q", model.ErrInvalidHTTPFormat, firstLine)
 	}
 
-	headers, body := parseHeadersAndBody(lines[2:])
+	if requestLineIdx >= len(lines) {
+		return nil, fmt.Errorf("%w: missing request line", model.ErrInvalidHTTPFormat)
+	}
+
+	method, url, err := parseRequestLine(strings.TrimSpace(lines[requestLineIdx]))
+	if err != nil {
+		return nil, err
+	}
+
+	// If no comment name, derive name from "METHOD URL"
+	if name == "" {
+		name = method + " " + url
+	}
+
+	// Check if Host header provides the base URL (for relative paths like "/api/users")
+	remainingLines := lines[requestLineIdx+1:]
+	headers, body := parseHeadersAndBody(remainingLines)
+
+	// If URL is a relative path, prepend the Host header value
+	if strings.HasPrefix(url, "/") {
+		for _, h := range headers {
+			if strings.EqualFold(h.Key, "Host") {
+				url = h.Value + url
+				break
+			}
+		}
+	}
+
+	// Filter out Host header from the exported headers (Postman uses URL, not Host)
+	filteredHeaders := filterHostHeader(headers)
 
 	return &model.HTTPRequest{
 		Name:    name,
-		Method:  urlLine[0],
-		URL:     urlLine[1],
-		Headers: headers,
+		Method:  method,
+		URL:     url,
+		Headers: filteredHeaders,
 		Body:    body,
 	}, nil
+}
+
+// parseRequestLine parses "METHOD URL" or "METHOD URL HTTP/1.1" into method and URL.
+func parseRequestLine(line string) (string, string, error) {
+	parts := strings.Fields(line)
+	if len(parts) < 2 {
+		return "", "", fmt.Errorf("%w: %q", model.ErrInvalidURLFormat, line)
+	}
+	method := parts[0]
+	if !httpMethods[method] {
+		return "", "", fmt.Errorf("%w: unknown method %q in %q", model.ErrInvalidURLFormat, method, line)
+	}
+	url := parts[1]
+	// parts[2] would be "HTTP/1.1" if present — we ignore it
+	return method, url, nil
+}
+
+// filterHostHeader removes Host headers since the URL already contains the host.
+func filterHostHeader(headers []model.HTTPHeader) []model.HTTPHeader {
+	var filtered []model.HTTPHeader
+	for _, h := range headers {
+		if !strings.EqualFold(h.Key, "Host") {
+			filtered = append(filtered, h)
+		}
+	}
+	return filtered
 }
 
 func parseHeadersAndBody(lines []string) ([]model.HTTPHeader, string) {

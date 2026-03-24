@@ -1,0 +1,8 @@
+POST /cache/public-api/invalidate HTTP/1.1
+Host: {{API_URL}}
+Content-Type: application/json
+Authorization: {{DEVELOPER_KEY}}
+
+{
+    "paths": ["/*"]
+}
