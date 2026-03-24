@@ -1,107 +1,140 @@
 # http2postman
 
 `http2postman` es una herramienta de línea de comandos (CLI) que permite convertir archivos HTTP en colecciones de
-Postman y viceversa. Esta herramienta facilita la gestión y el intercambio de colecciones de solicitudes HTTP entre
-diferentes entornos y equipos.
+Postman y viceversa. Facilita la gestión y el intercambio de colecciones de solicitudes HTTP entre diferentes entornos
+y equipos.
 
 ## Instalación
 
+### Usando Homebrew (macOS)
+
+```sh
+brew tap drossan/homebrew-tools
+brew install http2postman
+```
+
 ### Desde el código fuente
 
-1. Clona este repositorio:
-    ```sh
-    git clone https://github.com/tuusuario/http2postman.git
-    cd http2postman
-    ```
+```sh
+git clone https://github.com/drossan/http2postman.git
+cd http2postman
+make build
+```
 
-2. Construye la herramienta:
-    ```sh
-    go build -o http2postman
-    ```
+El binario se genera en `bin/http2postman`.
 
-### Usando Homebrew en macOS
+### Requisitos
 
-1. Añade el repositorio tap:
-    ```sh
-    brew tap drossan/homebrew-tools
-    ```
-
-2. Instala la herramienta:
-    ```sh
-    brew install http2postman
-    ```
+- Go 1.22 o superior
 
 ## Uso
 
 ### Exportar solicitudes HTTP a una colección de Postman
 
 ```sh
-./http2postman export [directorio]
-
-## Uso
-
-### Exportar solicitudes HTTP a una colección de Postman
-
-```bash
-./http2postman export [directorio]
+http2postman export [directorio]
 ```
 
-Este comando lee los archivos HTTP en el directorio especificado y crea una colección de Postman en formato JSON.
+Lee los archivos `.http` en el directorio especificado y genera una colección de Postman en formato JSON.
 
-Ejemplo
-Supongamos que tienes la siguiente estructura de directorios:
+**Ejemplo:**
 
-```text
-/http-requests/
-|-- backend
-|   |-- auth.http
-|   |-- users.http
+Dada la siguiente estructura de directorios:
+
+```
+http-requests/
+├── backend/
+│   ├── auth.http
+│   └── users.http
+└── frontend/
+    └── pages.http
 ```
 
-Ejecuta el siguiente comando:
+Ejecuta:
 
-```bash
-./http2postman export http-requests
+```sh
+http2postman export http-requests
 ```
 
-La herramienta te pedirá que ingreses un nombre para la colección de Postman. Una vez ingresado, se generará un archivo
-postman_collection.json con la estructura y contenido de las solicitudes HTTP.
+La herramienta pedirá un nombre para la colección y generará el archivo `import_postman_collection.json` listo para
+importar en Postman.
 
-Esto generará un archivo .json con el que ya puedes importan tu colección http en postman!
+### Importar una colección de Postman a archivos HTTP
 
-### Importar una colección de Postman a archivos HTTP (Experimental)
-
-```bash
-./http2postman import http-requests
+```sh
+http2postman import [archivo.json]
 ```
 
-Este comando lee una colección de Postman en formato JSON y crea archivos HTTP en el directorio http-requests,
-replicando la estructura de la colección.
+Lee una colección de Postman en formato JSON y genera archivos `.http` en el directorio `http-requests/`, replicando
+la estructura de carpetas de la colección.
 
-Ejemplo
-Supongamos que tienes un archivo import_postman_collection.json con la colección de Postman. Ejecuta el siguiente
-comando:
+**Ejemplo:**
 
-```bash
-./http2postman import import_postman_collection.json
+```sh
+http2postman import import_postman_collection.json
 ```
 
-Esto creará archivos HTTP en el directorio http-requests según la estructura y contenido de la colección de Postman.
+Esto creará archivos `.http` en `http-requests/` con la estructura y contenido de la colección.
+
+## Formato de archivos .http
+
+La herramienta usa el formato de IntelliJ HTTP Client. Cada archivo puede contener múltiples requests separados
+por `###`:
+
+```http
+# Obtener usuarios
+GET https://api.example.com/users
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+###
+
+# Crear usuario
+POST https://api.example.com/users
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "John",
+  "email": "john@example.com"
+}
+```
+
+## Variables de entorno
+
+Si existe un archivo `http-client.env.json` en el directorio de los archivos `.http` (o en un directorio padre), las
+variables se incluirán automáticamente en la colección de Postman exportada.
+
+```json
+{
+  "dev": {
+    "host": "https://dev.api.example.com",
+    "token": "dev-token"
+  },
+  "prod": {
+    "host": "https://api.example.com",
+    "token": "prod-token"
+  }
+}
+```
 
 ## Notas
 
-La herramienta soporta encabezados y cuerpos en las solicitudes HTTP.
-Si una solicitud en la colección de Postman no contiene una autorización, la herramienta buscará una autorización en los
-elementos padre y la agregará a la solicitud.
-La herramienta omitirá claves vacías en los datos de formularios al generar los archivos HTTP.
+- Soporta encabezados y cuerpos (raw y form-data) en las solicitudes HTTP.
+- En la importación, si una solicitud no contiene autorización, se hereda del elemento padre (Bearer token).
+- Se omiten claves vacías en datos de formularios al generar archivos `.http`.
 
-## Versiones Inestables
+## Plataformas soportadas
 
-Además de las versiones estables, http2postman también proporciona versiones inestables que puedes probar. Estas
-versiones están disponibles para los siguientes entornos:
+| OS | Arquitecturas |
+|----|---------------|
+| Linux | amd64, arm64, 386, arm |
+| macOS | amd64, arm64 (Universal Binary) |
+| Windows | amd64, arm64, 386, arm |
 
-- Linux
-- macOS
-- Windows
+Las versiones estables e inestables están disponibles en la
+[página de releases](https://github.com/drossan/http2postman/releases).
 
-Puedes descargar las versiones inestables desde la página de lanzamientos del repositorio en GitHub.
+## Licencia
+
+Este proyecto está pendiente de definir su licencia.
