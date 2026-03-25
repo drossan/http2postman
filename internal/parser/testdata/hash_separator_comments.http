@@ -1,0 +1,7 @@
+### Obtener preview usando UUID entity (acceso público sin autenticación)
+### El :id debe ser un UUID v4 válido (obtenido al crear el share)
+### No requiere Authorization header
+
+GET /page/1e171b9e-e662-4569-95ef-519c2bc2f667/preview HTTP/1.1
+Host: {{API_URL}}
+Content-Type: application/json

@@ -10,8 +10,6 @@ import (
 	"github.com/drossan/http2postman/internal/model"
 )
 
-const httpSectionSeparator = "###"
-
 // HTTPFileParser parses .http files using an injected filesystem.
 type HTTPFileParser struct {
 	fs fs.FileSystem
@@ -69,26 +67,58 @@ func (p *HTTPFileParser) ParseDirectory(dir string) ([]model.HTTPFile, error) {
 	return files, nil
 }
 
+// httpMethods contains the standard HTTP methods for detecting request lines.
+var httpMethods = map[string]bool{
+	"GET": true, "POST": true, "PUT": true, "PATCH": true,
+	"DELETE": true, "HEAD": true, "OPTIONS": true, "TRACE": true, "CONNECT": true,
+}
+
+// isRequestLine reports whether a trimmed line starts with an HTTP method.
+func isRequestLine(trimmed string) bool {
+	return httpMethods[strings.SplitN(trimmed, " ", 2)[0]]
+}
+
 // ParseHTTPContent parses the text content of an .http file into requests.
+// It scans lines looking for HTTP verb lines as request boundaries. Everything
+// before a verb line is treated as comments/name; everything after is headers+body.
 func ParseHTTPContent(content string) ([]model.HTTPRequest, error) {
 	content = strings.TrimSpace(content)
 	if content == "" {
 		return nil, model.ErrInvalidHTTPFormat
 	}
 
-	sections := strings.Split(content, httpSectionSeparator)
+	lines := strings.Split(content, "\n")
 	var requests []model.HTTPRequest
+	var commentLines []string
 
-	for _, section := range sections {
-		section = strings.TrimSpace(section)
-		if section == "" {
+	for i := 0; i < len(lines); {
+		trimmed := strings.TrimSpace(lines[i])
+
+		// Skip blank lines between requests
+		if trimmed == "" {
+			i++
 			continue
 		}
-		req, err := parseHTTPSection(section)
+
+		// Comment or separator line: accumulate for the next request name
+		if strings.HasPrefix(trimmed, "#") {
+			commentLines = append(commentLines, trimmed)
+			i++
+			continue
+		}
+
+		// Check for HTTP verb → start of a request
+		if !isRequestLine(trimmed) {
+			return nil, fmt.Errorf("%w: unexpected line: %q", model.ErrInvalidHTTPFormat, trimmed)
+		}
+
+		req, consumed, err := parseRequest(commentLines, lines[i:])
 		if err != nil {
 			return nil, err
 		}
 		requests = append(requests, *req)
+		commentLines = nil
+		i += consumed
 	}
 
 	if len(requests) == 0 {
@@ -97,62 +127,27 @@ func ParseHTTPContent(content string) ([]model.HTTPRequest, error) {
 	return requests, nil
 }
 
-// httpMethods contains the standard HTTP methods for detecting request lines.
-var httpMethods = map[string]bool{
-	"GET": true, "POST": true, "PUT": true, "PATCH": true,
-	"DELETE": true, "HEAD": true, "OPTIONS": true, "TRACE": true, "CONNECT": true,
-}
+// parseRequest builds an HTTPRequest from accumulated comment lines and
+// the remaining lines starting at the request (verb) line. Returns the
+// request and how many lines from requestLines were consumed.
+func parseRequest(comments []string, requestLines []string) (*model.HTTPRequest, int, error) {
+	// Extract name from first comment
+	name := extractName(comments)
 
-func parseHTTPSection(section string) (*model.HTTPRequest, error) {
-	lines := strings.Split(section, "\n")
-	if len(lines) < 1 {
-		return nil, fmt.Errorf("%w: empty section", model.ErrInvalidHTTPFormat)
-	}
-
-	// Find the request line (METHOD URL), skipping comment lines (#) and blank lines.
-	// The first comment line becomes the request name.
-	var name string
-	requestLineIdx := -1
-
-	for i, line := range lines {
-		trimmed := strings.TrimSpace(line)
-		if trimmed == "" {
-			continue
-		}
-		firstWord := strings.SplitN(trimmed, " ", 2)[0]
-		if httpMethods[firstWord] {
-			requestLineIdx = i
-			break
-		}
-		if strings.HasPrefix(trimmed, "#") {
-			// Use the first comment as name; skip subsequent comments
-			if name == "" {
-				name = cleanCommentName(trimmed)
-			}
-			continue
-		}
-		return nil, fmt.Errorf("%w: unexpected line before request: %q", model.ErrInvalidHTTPFormat, trimmed)
-	}
-
-	if requestLineIdx < 0 {
-		return nil, fmt.Errorf("%w: no request line found", model.ErrInvalidHTTPFormat)
-	}
-
-	method, url, err := parseRequestLine(strings.TrimSpace(lines[requestLineIdx]))
+	method, url, err := parseRequestLine(strings.TrimSpace(requestLines[0]))
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
-	// If no comment name, derive name from "METHOD URL"
 	if name == "" {
 		name = method + " " + url
 	}
 
-	// Check if Host header provides the base URL (for relative paths like "/api/users")
-	remainingLines := lines[requestLineIdx+1:]
-	headers, body := parseHeadersAndBody(remainingLines)
+	// Collect header and body lines until next request or end
+	remaining := requestLines[1:]
+	consumed := findNextRequest(remaining)
+	headers, body := parseHeadersAndBody(remaining[:consumed])
 
-	// If URL is a relative path, prepend the Host header value
 	if strings.HasPrefix(url, "/") {
 		for _, h := range headers {
 			if strings.EqualFold(h.Key, "Host") {
@@ -162,16 +157,58 @@ func parseHTTPSection(section string) (*model.HTTPRequest, error) {
 		}
 	}
 
-	// Filter out Host header from the exported headers (Postman uses URL, not Host)
-	filteredHeaders := filterHostHeader(headers)
-
 	return &model.HTTPRequest{
 		Name:    name,
 		Method:  method,
 		URL:     url,
-		Headers: filteredHeaders,
+		Headers: filterHostHeader(headers),
 		Body:    body,
-	}, nil
+	}, consumed + 1, nil
+}
+
+// extractName returns the cleaned name from the first comment line.
+func extractName(comments []string) string {
+	for _, c := range comments {
+		cleaned := cleanCommentName(c)
+		if cleaned != "" {
+			return cleaned
+		}
+	}
+	return ""
+}
+
+// findNextRequest returns the number of lines to consume before the
+// next request starts. When it hits a comment/separator line, it scans
+// ahead for a following HTTP verb; if found, the comment belongs to
+// the next request so we stop here.
+func findNextRequest(lines []string) int {
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if isRequestLine(trimmed) {
+			return i
+		}
+		if !strings.HasPrefix(trimmed, "#") {
+			continue
+		}
+		// Comment line: check if a verb follows (skipping blanks/comments).
+		if nextVerbFollows(lines[i+1:]) {
+			return i
+		}
+	}
+	return len(lines)
+}
+
+// nextVerbFollows reports whether the next non-blank, non-comment line
+// is an HTTP request line.
+func nextVerbFollows(lines []string) bool {
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
+			continue
+		}
+		return isRequestLine(trimmed)
+	}
+	return false
 }
 
 // parseRequestLine parses "METHOD URL" or "METHOD URL HTTP/1.1" into method and URL.

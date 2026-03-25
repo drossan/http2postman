@@ -13,22 +13,27 @@ import (
 var titleCaser = cases.Title(language.Und)
 
 // HTTPFilesToCollection converts parsed HTTP files into a Postman collection.
-func HTTPFilesToCollection(files []model.HTTPFile, name string, env *model.Environment) *model.PostmanCollection {
+func HTTPFilesToCollection(files []model.HTTPFile, name string, version string, env *model.Environment) *model.PostmanCollection {
+	displayName := name
+	if version != "" {
+		displayName = name + " v" + version
+	}
+
 	collection := &model.PostmanCollection{
 		Info: model.PostmanInfo{
-			Name:        name,
+			Name:        displayName,
 			PostmanID:   "generated-id",
 			Description: "Generated from HTTP files",
 			Schema:      model.PostmanSchemaV210,
+			Version:     version,
 		},
 	}
 
 	for _, file := range files {
 		items := httpRequestsToPostmanItems(file.Requests)
-		groupName := formatGroupName(filepath.Base(file.Path))
 		dirParts := strings.Split(filepath.Dir(file.Path), string(filepath.Separator))
 
-		addToHierarchy(&collection.Item, dirParts, groupName, items)
+		addToHierarchy(&collection.Item, dirParts, items)
 	}
 
 	// Hoist shared auth to parent folders so children use "Inherit auth from parent"
@@ -75,7 +80,7 @@ func httpRequestToPostmanItem(req model.HTTPRequest) model.PostmanItem {
 	return item
 }
 
-func addToHierarchy(items *[]model.PostmanItem, dirParts []string, groupName string, requests []model.PostmanItem) {
+func addToHierarchy(items *[]model.PostmanItem, dirParts []string, requests []model.PostmanItem) {
 	current := items
 
 	for _, part := range dirParts {
@@ -99,11 +104,7 @@ func addToHierarchy(items *[]model.PostmanItem, dirParts []string, groupName str
 		}
 	}
 
-	fileGroup := model.PostmanItem{
-		Name: groupName,
-		Item: requests,
-	}
-	*current = append(*current, fileGroup)
+	*current = append(*current, requests...)
 }
 
 // FormatGroupName formats a name for display (exported for testing).

@@ -16,21 +16,22 @@ func TestHTTPFilesToCollection_SingleFile(t *testing.T) {
 		},
 	}
 
-	col := HTTPFilesToCollection(files, "Test", nil)
+	col := HTTPFilesToCollection(files, "Test", "", nil)
 	if col.Info.Name != "Test" {
 		t.Errorf("name: got %q", col.Info.Name)
 	}
 	if col.Info.Schema != model.PostmanSchemaV210 {
 		t.Errorf("schema: got %q", col.Info.Schema)
 	}
+	// Request should be directly at the collection root (no file-name folder)
 	if len(col.Item) != 1 {
 		t.Fatalf("expected 1 item, got %d", len(col.Item))
 	}
-	if len(col.Item[0].Item) != 1 {
-		t.Fatalf("expected 1 request in group, got %d", len(col.Item[0].Item))
+	if col.Item[0].Request == nil {
+		t.Fatal("expected a request item, got a folder")
 	}
-	if col.Item[0].Item[0].Request.Method != "GET" {
-		t.Errorf("method: got %q", col.Item[0].Item[0].Request.Method)
+	if col.Item[0].Request.Method != "GET" {
+		t.Errorf("method: got %q", col.Item[0].Request.Method)
 	}
 }
 
@@ -50,7 +51,7 @@ func TestHTTPFilesToCollection_DirectoryHierarchy(t *testing.T) {
 		},
 	}
 
-	col := HTTPFilesToCollection(files, "Test", nil)
+	col := HTTPFilesToCollection(files, "Test", "", nil)
 
 	// Should have one top-level folder: "Backend"
 	if len(col.Item) != 1 {
@@ -61,8 +62,19 @@ func TestHTTPFilesToCollection_DirectoryHierarchy(t *testing.T) {
 	}
 
 	// Backend should have 2 subfolders: Auth and Users
-	if len(col.Item[0].Item) != 2 {
-		t.Fatalf("expected 2 subfolders, got %d", len(col.Item[0].Item))
+	backend := col.Item[0]
+	if len(backend.Item) != 2 {
+		t.Fatalf("expected 2 subfolders, got %d", len(backend.Item))
+	}
+
+	// Each subfolder should directly contain the request (no file-name folder)
+	for _, sub := range backend.Item {
+		if len(sub.Item) != 1 {
+			t.Fatalf("subfolder %q: expected 1 request, got %d", sub.Name, len(sub.Item))
+		}
+		if sub.Item[0].Request == nil {
+			t.Errorf("subfolder %q: expected request, got folder", sub.Name)
+		}
 	}
 }
 
@@ -77,9 +89,43 @@ func TestHTTPFilesToCollection_WithEnvironment(t *testing.T) {
 		"dev": {"host": "https://dev.api.com", "token": "abc"},
 	}
 
-	col := HTTPFilesToCollection(files, "Test", env)
+	col := HTTPFilesToCollection(files, "Test", "", env)
 	if len(col.Variable) != 2 {
 		t.Fatalf("expected 2 variables, got %d", len(col.Variable))
+	}
+}
+
+func TestHTTPFilesToCollection_WithVersion(t *testing.T) {
+	files := []model.HTTPFile{
+		{
+			Path:     "api.http",
+			Requests: []model.HTTPRequest{{Name: "Test", Method: "GET", URL: "http://x"}},
+		},
+	}
+
+	col := HTTPFilesToCollection(files, "Griddo API", "1.0.0", nil)
+	if col.Info.Name != "Griddo API v1.0.0" {
+		t.Errorf("name: got %q, want %q", col.Info.Name, "Griddo API v1.0.0")
+	}
+	if col.Info.Version != "1.0.0" {
+		t.Errorf("version: got %q, want %q", col.Info.Version, "1.0.0")
+	}
+}
+
+func TestHTTPFilesToCollection_NoVersion(t *testing.T) {
+	files := []model.HTTPFile{
+		{
+			Path:     "api.http",
+			Requests: []model.HTTPRequest{{Name: "Test", Method: "GET", URL: "http://x"}},
+		},
+	}
+
+	col := HTTPFilesToCollection(files, "My API", "", nil)
+	if col.Info.Name != "My API" {
+		t.Errorf("name: got %q, want %q", col.Info.Name, "My API")
+	}
+	if col.Info.Version != "" {
+		t.Errorf("version: got %q, want empty", col.Info.Version)
 	}
 }
 
@@ -177,7 +223,7 @@ func TestHoistAuth_AllSameBearer(t *testing.T) {
 		},
 	}
 
-	col := HTTPFilesToCollection(files, "Test", nil)
+	col := HTTPFilesToCollection(files, "Test", "", nil)
 
 	// "Logs" folder should have auth set
 	logsFolder := col.Item[0]
@@ -191,16 +237,14 @@ func TestHoistAuth_AllSameBearer(t *testing.T) {
 		t.Errorf("auth type: got %q, want %q", logsFolder.Auth.Type, "apikey")
 	}
 
-	// Descendant requests should NOT have Authorization header
-	for _, subfolder := range logsFolder.Item {
-		for _, reqItem := range subfolder.Item {
-			if reqItem.Request == nil {
-				continue
-			}
-			for _, h := range reqItem.Request.Header {
-				if h.Key == "Authorization" {
-					t.Errorf("request %q should not have Authorization header (should inherit)", reqItem.Name)
-				}
+	// Requests directly inside Logs should NOT have Authorization header
+	for _, reqItem := range logsFolder.Item {
+		if reqItem.Request == nil {
+			continue
+		}
+		for _, h := range reqItem.Request.Header {
+			if h.Key == "Authorization" {
+				t.Errorf("request %q should not have Authorization header (should inherit)", reqItem.Name)
 			}
 		}
 	}
@@ -221,7 +265,7 @@ func TestHoistAuth_BearerToken(t *testing.T) {
 		},
 	}
 
-	col := HTTPFilesToCollection(files, "Test", nil)
+	col := HTTPFilesToCollection(files, "Test", "", nil)
 	folder := col.Item[0]
 	if folder.Auth == nil {
 		t.Fatal("expected auth on folder")
@@ -229,7 +273,6 @@ func TestHoistAuth_BearerToken(t *testing.T) {
 	if folder.Auth.Type != "apikey" {
 		t.Errorf("auth type: got %q, want %q", folder.Auth.Type, "apikey")
 	}
-	// Should have value="Bearer my-token", key="Authorization", in="header"
 	foundValue := false
 	for _, kv := range folder.Auth.APIKey {
 		if kv.Key == "value" && kv.Value == "Bearer my-token" {
@@ -256,27 +299,25 @@ func TestHoistAuth_MixedAuth_NoHoist(t *testing.T) {
 		},
 	}
 
-	col := HTTPFilesToCollection(files, "Test", nil)
+	col := HTTPFilesToCollection(files, "Test", "", nil)
 	folder := col.Item[0]
 	if folder.Auth != nil {
 		t.Error("should NOT hoist auth when requests have different tokens")
 	}
 
 	// Requests should keep their headers
-	for _, sub := range folder.Item {
-		for _, req := range sub.Item {
-			if req.Request == nil {
-				continue
+	for _, req := range folder.Item {
+		if req.Request == nil {
+			continue
+		}
+		found := false
+		for _, h := range req.Request.Header {
+			if h.Key == "Authorization" {
+				found = true
 			}
-			found := false
-			for _, h := range req.Request.Header {
-				if h.Key == "Authorization" {
-					found = true
-				}
-			}
-			if !found {
-				t.Errorf("request %q should still have Authorization header", req.Name)
-			}
+		}
+		if !found {
+			t.Errorf("request %q should still have Authorization header", req.Name)
 		}
 	}
 }
@@ -291,7 +332,7 @@ func TestHoistAuth_NoAuth_NoHoist(t *testing.T) {
 		},
 	}
 
-	col := HTTPFilesToCollection(files, "Test", nil)
+	col := HTTPFilesToCollection(files, "Test", "", nil)
 	if col.Item[0].Auth != nil {
 		t.Error("should not set auth on folder when requests have no auth")
 	}

@@ -17,14 +17,15 @@ type PostmanInfo struct {
 	PostmanID   string `json:"_postman_id"`
 	Description string `json:"description"`
 	Schema      string `json:"schema"`
+	Version     string `json:"version,omitempty"`
 }
 
 // PostmanItem can be a folder (has Item) or a request (has Request).
 type PostmanItem struct {
-	Name    string         `json:"name"`
-	Item    []PostmanItem  `json:"item,omitempty"`
-	Request *PostmanReq    `json:"request,omitempty"`
-	Auth    *PostmanAuth   `json:"auth,omitempty"`
+	Name    string        `json:"name"`
+	Item    []PostmanItem `json:"item,omitempty"`
+	Request *PostmanReq   `json:"request,omitempty"`
+	Auth    *PostmanAuth  `json:"auth,omitempty"`
 }
 
 // IsFolder returns true if the item is a folder (contains sub-items, no request).
@@ -77,8 +78,8 @@ type PostmanHeader struct {
 
 // PostmanBody represents the request body.
 type PostmanBody struct {
-	Mode     string           `json:"mode"`
-	Raw      string           `json:"raw,omitempty"`
+	Mode     string            `json:"mode"`
+	Raw      string            `json:"raw,omitempty"`
 	FormData []PostmanFormData `json:"formdata,omitempty"`
 }
 

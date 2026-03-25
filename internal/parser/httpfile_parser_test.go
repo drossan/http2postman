@@ -240,6 +240,37 @@ func TestParseHTTPContent_MultilineComments(t *testing.T) {
 	}
 }
 
+func TestParseHTTPContent_HashSeparatorComments(t *testing.T) {
+	content, err := os.ReadFile("testdata/hash_separator_comments.http")
+	if err != nil {
+		t.Fatalf("reading fixture: %v", err)
+	}
+
+	requests, err := ParseHTTPContent(string(content))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(requests) != 1 {
+		t.Fatalf("expected 1 request, got %d", len(requests))
+	}
+
+	req := requests[0]
+	// First ### comment line becomes the name
+	if req.Name != "Obtener preview usando UUID entity (acceso público sin autenticación)" {
+		t.Errorf("name: got %q", req.Name)
+	}
+	if req.Method != "GET" {
+		t.Errorf("method: got %q, want %q", req.Method, "GET")
+	}
+	if req.URL != "{{API_URL}}/page/1e171b9e-e662-4569-95ef-519c2bc2f667/preview" {
+		t.Errorf("url: got %q", req.URL)
+	}
+	// Host should be filtered out, leaving only Content-Type
+	if len(req.Headers) != 1 {
+		t.Errorf("expected 1 header, got %d: %+v", len(req.Headers), req.Headers)
+	}
+}
+
 func TestCleanCommentName(t *testing.T) {
 	tests := []struct {
 		input    string

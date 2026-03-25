@@ -39,7 +39,7 @@ func TestRoundtrip_ExportThenImport(t *testing.T) {
 	}
 
 	// 2. Convert HTTP → Postman
-	collection := HTTPFilesToCollection(originalFiles, "Roundtrip Test", nil)
+	collection := HTTPFilesToCollection(originalFiles, "Roundtrip Test", "", nil)
 
 	if collection.Info.Name != "Roundtrip Test" {
 		t.Errorf("collection name: got %q", collection.Info.Name)

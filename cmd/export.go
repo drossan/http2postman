@@ -47,7 +47,22 @@ var exportCmd = &cobra.Command{
 			env = &parsedEnv
 		}
 
-		collection := converter.HTTPFilesToCollection(files, collectionName, env)
+		// Auto-generate versioned output path if not explicitly set
+		var version string
+		if output == "" {
+			_, _, _, found := writer.FindLatestVersion(fsys, ".", collectionName)
+			bump := writer.BumpMinor
+			if found {
+				var err error
+				bump, err = promptBumpType(cmd.InOrStdin())
+				if err != nil {
+					return err
+				}
+			}
+			output, version = writer.ResolveVersionedOutput(fsys, ".", collectionName, bump)
+		}
+
+		collection := converter.HTTPFilesToCollection(files, collectionName, version, env)
 
 		postmanWriter := writer.NewPostmanWriter(fsys)
 		if err := postmanWriter.Write(collection, output, force); err != nil {
@@ -61,8 +76,27 @@ var exportCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(exportCmd)
-	exportCmd.Flags().StringP("output", "o", "import_postman_collection.json", "Output file path")
+	exportCmd.Flags().StringP("output", "o", "", "Output file path (auto-generated with versioning if omitted)")
 	exportCmd.Flags().BoolP("force", "f", false, "Overwrite output file if exists")
+}
+
+func promptBumpType(reader io.Reader) (writer.BumpType, error) {
+	fmt.Print("Version bump — [1] minor (default), [2] patch, [3] major: ")
+	scanner := bufio.NewScanner(reader)
+	if !scanner.Scan() {
+		return writer.BumpMinor, nil
+	}
+	choice := strings.TrimSpace(scanner.Text())
+	switch choice {
+	case "", "1":
+		return writer.BumpMinor, nil
+	case "2":
+		return writer.BumpPatch, nil
+	case "3":
+		return writer.BumpMajor, nil
+	default:
+		return 0, fmt.Errorf("invalid choice: %q (expected 1, 2, or 3)", choice)
+	}
 }
 
 func promptCollectionName(reader io.Reader) (string, error) {
@@ -80,4 +114,3 @@ func promptCollectionName(reader io.Reader) (string, error) {
 	}
 	return name, nil
 }
-
