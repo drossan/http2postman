@@ -1,6 +1,8 @@
 package converter
 
 import (
+	"crypto/sha1"
+	"fmt"
 	"path/filepath"
 	"strings"
 
@@ -14,15 +16,10 @@ var titleCaser = cases.Title(language.Und)
 
 // HTTPFilesToCollection converts parsed HTTP files into a Postman collection.
 func HTTPFilesToCollection(files []model.HTTPFile, name string, version string, env *model.Environment) *model.PostmanCollection {
-	displayName := name
-	if version != "" {
-		displayName = name + " v" + version
-	}
-
 	collection := &model.PostmanCollection{
 		Info: model.PostmanInfo{
-			Name:        displayName,
-			PostmanID:   "generated-id",
+			Name:        name,
+			PostmanID:   generateCollectionID(name),
 			Description: "Generated from HTTP files",
 			Schema:      model.PostmanSchemaV210,
 			Version:     version,
@@ -250,6 +247,24 @@ func removeAuthHeader(items *[]model.PostmanItem) {
 			item.Request.Header = filtered
 		}
 	}
+}
+
+// generateCollectionID produces a deterministic UUID v5 from the collection
+// name so that all versions of the same collection share one Postman ID.
+// This lets Postman detect imports as updates rather than new collections.
+func generateCollectionID(name string) string {
+	// UUID v5 namespace for http2postman collections
+	namespace := "http2postman-collection"
+	h := sha1.New()
+	h.Write([]byte(namespace))
+	h.Write([]byte(name))
+	b := h.Sum(nil)
+
+	// Set version (5) and variant bits per RFC 4122
+	b[6] = (b[6] & 0x0f) | 0x50
+	b[8] = (b[8] & 0x3f) | 0x80
+
+	return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:16])
 }
 
 func environmentToVars(env model.Environment) []model.PostmanVar {

@@ -1,8 +1,8 @@
 package writer
 
 import (
+	"encoding/json"
 	"fmt"
-	stdfs "io/fs"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -32,49 +32,48 @@ func NameToSlug(name string) string {
 	return name
 }
 
-// FindLatestVersion scans the directory for existing versioned files
-// matching the collection slug and returns the highest version found.
-// Returns found=false if no matching files exist.
-func FindLatestVersion(fsys fs.FileSystem, dir string, collectionName string) (major, minor, patch int, found bool) {
-	slug := NameToSlug(collectionName)
-	prefix := slug + "_"
-	versionRegexp := regexp.MustCompile(`^` + regexp.QuoteMeta(prefix) + `(\d+)_(\d+)_(\d+)\.json$`)
-
-	fsys.Walk(dir, func(path string, info stdfs.FileInfo, err error) error {
-		if err != nil || info.IsDir() {
-			return nil
-		}
-		name := filepath.Base(path)
-		matches := versionRegexp.FindStringSubmatch(name)
-		if matches == nil {
-			return nil
-		}
-		ma, _ := strconv.Atoi(matches[1])
-		mi, _ := strconv.Atoi(matches[2])
-		pa, _ := strconv.Atoi(matches[3])
-
-		if !found || compareVersions(ma, mi, pa, major, minor, patch) > 0 {
-			major, minor, patch = ma, mi, pa
-			found = true
-		}
-		return nil
-	})
-	return
+// OutputPath returns the canonical output file path for a collection name.
+// The file is always the same: "griddo_api.json" for "Griddo API".
+func OutputPath(dir string, collectionName string) string {
+	return filepath.Join(dir, NameToSlug(collectionName)+".json")
 }
 
-func compareVersions(ma1, mi1, pa1, ma2, mi2, pa2 int) int {
-	if ma1 != ma2 {
-		return ma1 - ma2
+// ReadExistingVersion reads the version from an existing collection JSON file.
+// Returns 0,0,0,false if the file doesn't exist or has no version.
+func ReadExistingVersion(fsys fs.FileSystem, path string) (major, minor, patch int, found bool) {
+	data, err := fsys.ReadFile(path)
+	if err != nil {
+		return 0, 0, 0, false
 	}
-	if mi1 != mi2 {
-		return mi1 - mi2
+
+	var col struct {
+		Info struct {
+			Version string `json:"version"`
+		} `json:"info"`
 	}
-	return pa1 - pa2
+	if err := json.Unmarshal(data, &col); err != nil || col.Info.Version == "" {
+		return 0, 0, 0, false
+	}
+
+	return parseVersion(col.Info.Version)
 }
 
-// BuildVersionedPath creates the output path and version string by applying
-// the given bump type to the provided version.
-func BuildVersionedPath(dir string, slug string, major, minor, patch int, bump BumpType) (string, string) {
+func parseVersion(v string) (major, minor, patch int, ok bool) {
+	parts := strings.Split(v, ".")
+	if len(parts) != 3 {
+		return 0, 0, 0, false
+	}
+	ma, err1 := strconv.Atoi(parts[0])
+	mi, err2 := strconv.Atoi(parts[1])
+	pa, err3 := strconv.Atoi(parts[2])
+	if err1 != nil || err2 != nil || err3 != nil {
+		return 0, 0, 0, false
+	}
+	return ma, mi, pa, true
+}
+
+// BumpVersion applies the given bump type and returns the new version string.
+func BumpVersion(major, minor, patch int, bump BumpType) string {
 	switch bump {
 	case BumpMajor:
 		major++
@@ -86,22 +85,19 @@ func BuildVersionedPath(dir string, slug string, major, minor, patch int, bump B
 	case BumpPatch:
 		patch++
 	}
-
-	version := fmt.Sprintf("%d.%d.%d", major, minor, patch)
-	filename := fmt.Sprintf("%s_%d_%d_%d.json", slug, major, minor, patch)
-	return filepath.Join(dir, filename), version
+	return fmt.Sprintf("%d.%d.%d", major, minor, patch)
 }
 
-// ResolveVersionedOutput finds the latest existing version for the collection
-// and applies the given bump. If no previous version exists, returns 1.0.0.
+// ResolveVersionedOutput determines the output path and version for a collection.
+// If no previous file exists, returns version 1.0.0.
+// If a previous file exists, applies the given bump to its version.
 func ResolveVersionedOutput(fsys fs.FileSystem, dir string, collectionName string, bump BumpType) (string, string) {
-	slug := NameToSlug(collectionName)
-	major, minor, patch, found := FindLatestVersion(fsys, dir, collectionName)
+	path := OutputPath(dir, collectionName)
+	major, minor, patch, found := ReadExistingVersion(fsys, path)
 
 	if !found {
-		filename := fmt.Sprintf("%s_1_0_0.json", slug)
-		return filepath.Join(dir, filename), "1.0.0"
+		return path, "1.0.0"
 	}
 
-	return BuildVersionedPath(dir, slug, major, minor, patch, bump)
+	return path, BumpVersion(major, minor, patch, bump)
 }

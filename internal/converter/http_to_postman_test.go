@@ -95,6 +95,34 @@ func TestHTTPFilesToCollection_WithEnvironment(t *testing.T) {
 	}
 }
 
+func TestHTTPFilesToCollection_DeterministicID(t *testing.T) {
+	files := []model.HTTPFile{
+		{
+			Path:     "api.http",
+			Requests: []model.HTTPRequest{{Name: "Test", Method: "GET", URL: "http://x"}},
+		},
+	}
+
+	// Same name → same ID (so Postman recognizes it as the same collection)
+	col1 := HTTPFilesToCollection(files, "Griddo API", "1.0.0", nil)
+	col2 := HTTPFilesToCollection(files, "Griddo API", "2.0.0", nil)
+	if col1.Info.PostmanID != col2.Info.PostmanID {
+		t.Errorf("same name should produce same ID: %q vs %q", col1.Info.PostmanID, col2.Info.PostmanID)
+	}
+
+	// Different name → different ID
+	col3 := HTTPFilesToCollection(files, "Other API", "1.0.0", nil)
+	if col1.Info.PostmanID == col3.Info.PostmanID {
+		t.Error("different names should produce different IDs")
+	}
+
+	// ID should look like a UUID
+	id := col1.Info.PostmanID
+	if len(id) != 36 || id[8] != '-' || id[13] != '-' || id[18] != '-' || id[23] != '-' {
+		t.Errorf("expected UUID format, got %q", id)
+	}
+}
+
 func TestHTTPFilesToCollection_WithVersion(t *testing.T) {
 	files := []model.HTTPFile{
 		{
@@ -104,8 +132,8 @@ func TestHTTPFilesToCollection_WithVersion(t *testing.T) {
 	}
 
 	col := HTTPFilesToCollection(files, "Griddo API", "1.0.0", nil)
-	if col.Info.Name != "Griddo API v1.0.0" {
-		t.Errorf("name: got %q, want %q", col.Info.Name, "Griddo API v1.0.0")
+	if col.Info.Name != "Griddo API" {
+		t.Errorf("name: got %q, want %q", col.Info.Name, "Griddo API")
 	}
 	if col.Info.Version != "1.0.0" {
 		t.Errorf("version: got %q, want %q", col.Info.Version, "1.0.0")
